@@ -1,0 +1,51 @@
+name: ChatSphere AI Docker Build and Push
+
+on:
+  push:
+    branches:
+      - develop
+
+jobs:
+  docker-build-push:
+    name: Build and Push Docker Images
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Generate image tag
+        id: vars
+        run: |
+          echo "IMAGE_TAG=dev-${GITHUB_SHA::7}" >> $GITHUB_ENV
+
+      - name: Build backend Docker image
+        run: |
+          docker build \
+            -t nsmachine/production:backend-${IMAGE_TAG} \
+            ./backend
+
+      - name: Push backend Docker image
+        run: |
+          docker push nsmachine/production:backend-${IMAGE_TAG}
+
+      - name: Build frontend Docker image
+        run: |
+          docker build \
+            -t nsmachine/production:frontend-${IMAGE_TAG} \
+            ./frontend
+
+      - name: Push frontend Docker image
+        run: |
+          docker push nsmachine/production:frontend-${IMAGE_TAG}
+
+      - name: Print pushed images
+        run: |
+          echo "Backend Image: nsmachine/production:backend-${IMAGE_TAG}"
+          echo "Frontend Image: nsmachine/production:frontend-${IMAGE_TAG}"
