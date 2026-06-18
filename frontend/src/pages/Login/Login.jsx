@@ -1,10 +1,11 @@
+import axios from "axios";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 
-export default function Login() {
+const API_URL = import.meta.env.VITE_API_URL || "/api";
 
-  // Add these here
+export default function Login() {
   const navigate = useNavigate();
   const { login } = useAuth();
 
@@ -13,58 +14,92 @@ export default function Login() {
     password: "",
   });
 
-  const handleChange = (e) => {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleChange = (event) => {
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value,
+      [event.target.name]: event.target.value,
     });
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
 
-    login({
-      id: 1,
-      username: "nitin",
-      email: formData.email,
-    });
+    setError("");
 
-    navigate("/chat");
+    if (!formData.email || !formData.password) {
+      setError("Email and password are required");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const response = await axios.post(`${API_URL}/auth/login`, {
+        email: formData.email.trim().toLowerCase(),
+        password: formData.password,
+      });
+
+      console.log("LOGIN RESPONSE:", response.data);
+
+      login(response.data.user, response.data.token);
+
+      navigate("/chat");
+    } catch (error) {
+      console.error("Login Error:", error);
+
+      setError(
+        error?.response?.data?.message ||
+          "Invalid credentials. Please try again."
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="min-h-screen flex justify-center items-center">
-      <form
-        onSubmit={handleSubmit}
-        className="bg-white shadow-lg p-8 rounded-lg w-96"
-      >
-        <h1 className="text-3xl font-bold mb-6">
-          Login
-        </h1>
+    <div className="auth-page">
+      <div className="auth-card">
+        <h2>Login</h2>
 
-        <input
-          type="email"
-          name="email"
-          placeholder="Email"
-          className="border p-3 w-full mb-4"
-          onChange={handleChange}
-        />
+        {error && <p className="auth-error">{error}</p>}
 
-        <input
-          type="password"
-          name="password"
-          placeholder="Password"
-          className="border p-3 w-full mb-4"
-          onChange={handleChange}
-        />
+        <form onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label>Email</label>
 
-        <button
-          className="bg-blue-500 text-white w-full p-3 rounded"
-          type="submit"
-        >
-          Login
-        </button>
-      </form>
+            <input
+              type="email"
+              name="email"
+              placeholder="Enter your email"
+              value={formData.email}
+              onChange={handleChange}
+            />
+          </div>
+
+          <div className="form-group">
+            <label>Password</label>
+
+            <input
+              type="password"
+              name="password"
+              placeholder="Enter password"
+              value={formData.password}
+              onChange={handleChange}
+            />
+          </div>
+
+          <button type="submit" disabled={loading}>
+            {loading ? "Logging in..." : "Login"}
+          </button>
+        </form>
+
+        <p>
+          New user? <Link to="/register">Create account</Link>
+        </p>
+      </div>
     </div>
   );
 }
