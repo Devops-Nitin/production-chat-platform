@@ -1,4 +1,4 @@
-name: ChatSphere AI Docker Build and Push
+name: ChatSphere AI CI CD Pipeline
 
 on:
   push:
@@ -6,13 +6,22 @@ on:
       - develop
 
 jobs:
-  docker-build-push:
+  build-and-push:
     name: Build and Push Docker Images
     runs-on: ubuntu-latest
+
+    outputs:
+      image_tag: ${{ steps.vars.outputs.image_tag }}
 
     steps:
       - name: Checkout source code
         uses: actions/checkout@v4
+
+      - name: Generate image tag
+        id: vars
+        run: |
+          IMAGE_TAG=dev-${GITHUB_SHA::7}
+          echo "image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
@@ -20,32 +29,65 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Generate image tag
-        id: vars
-        run: |
-          echo "IMAGE_TAG=dev-${GITHUB_SHA::7}" >> $GITHUB_ENV
-
-      - name: Build backend Docker image
+      - name: Build backend image
         run: |
           docker build \
-            -t nsmachine/production:backend-${IMAGE_TAG} \
+            -t nsmachine/production:backend-${{ steps.vars.outputs.image_tag }} \
             ./backend
 
-      - name: Push backend Docker image
+      - name: Push backend image
         run: |
-          docker push nsmachine/production:backend-${IMAGE_TAG}
+          docker push nsmachine/production:backend-${{ steps.vars.outputs.image_tag }}
 
-      - name: Build frontend Docker image
+      - name: Build frontend image
         run: |
           docker build \
-            -t nsmachine/production:frontend-${IMAGE_TAG} \
+            -t nsmachine/production:frontend-${{ steps.vars.outputs.image_tag }} \
             ./frontend
 
-      - name: Push frontend Docker image
+      - name: Push frontend image
         run: |
-          docker push nsmachine/production:frontend-${IMAGE_TAG}
+          docker push nsmachine/production:frontend-${{ steps.vars.outputs.image_tag }}
 
-      - name: Print pushed images
+  deploy-to-kubernetes:
+    name: Deploy to Local Kubernetes
+    runs-on: self-hosted
+    needs: build-and-push
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Verify Kubernetes context
         run: |
-          echo "Backend Image: nsmachine/production:backend-${IMAGE_TAG}"
-          echo "Frontend Image: nsmachine/production:frontend-${IMAGE_TAG}"
+          kubectl config current-context
+          kubectl get nodes
+
+      - name: Deploy backend image
+        run: |
+          kubectl set image deployment/backend-deployment \
+            backend=nsmachine/production:backend-${{ needs.build-and-push.outputs.image_tag }} \
+            -n production-chat
+
+      - name: Deploy frontend image
+        run: |
+          kubectl set image deployment/frontend-deployment \
+            frontend=nsmachine/production:frontend-${{ needs.build-and-push.outputs.image_tag }} \
+            -n production-chat
+
+      - name: Wait for backend rollout
+        run: |
+          kubectl rollout status deployment/backend-deployment \
+            -n production-chat \
+            --timeout=180s
+
+      - name: Wait for frontend rollout
+        run: |
+          kubectl rollout status deployment/frontend-deployment \
+            -n production-chat \
+            --timeout=180s
+
+      - name: Verify pods
+        run: |
+          kubectl get pods -n production-chat
+          kubectl get ingress -n production-chat
