@@ -2,7 +2,7 @@ import axios from "axios";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
-const RAW_API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const RAW_API_URL = import.meta.env.VITE_API_URL || "/api";
 
 const API_BASE_URL = RAW_API_URL.endsWith("/api")
   ? RAW_API_URL.replace(/\/api$/, "")
