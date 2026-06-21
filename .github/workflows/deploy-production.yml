@@ -1,0 +1,64 @@
+name: ChatSphere AI Production Deploy
+
+on:
+  push:
+    branches:
+      - develop
+
+env:
+  DOCKER_IMAGE: nsmachine/production
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Generate Image Tags
+        run: |
+          echo "BACKEND_TAG=backend-${GITHUB_SHA::7}" >> $GITHUB_ENV
+          echo "FRONTEND_TAG=frontend-${GITHUB_SHA::7}" >> $GITHUB_ENV
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build Backend Image
+        run: |
+          docker build -t $DOCKER_IMAGE:$BACKEND_TAG ./backend
+          docker push $DOCKER_IMAGE:$BACKEND_TAG
+
+      - name: Build Frontend Image
+        run: |
+          docker build -t $DOCKER_IMAGE:$FRONTEND_TAG ./frontend
+          docker push $DOCKER_IMAGE:$FRONTEND_TAG
+
+      - name: Deploy to Public K3s Server
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+            cd /opt/chatsphere/production-chat-platform
+
+            git fetch origin
+            git checkout develop
+            git pull origin develop
+
+            sed -i "s|image: nsmachine/production:backend-.*|image: nsmachine/production:${{ env.BACKEND_TAG }}|g" k8s/backend-deployment.yaml
+            sed -i "s|image: nsmachine/production:backend-v1|image: nsmachine/production:${{ env.BACKEND_TAG }}|g" k8s/backend-deployment.yaml
+
+            sed -i "s|image: nsmachine/production:frontend-.*|image: nsmachine/production:${{ env.FRONTEND_TAG }}|g" k8s/frontend-deployment.yaml
+            sed -i "s|image: nsmachine/production:frontend-v13|image: nsmachine/production:${{ env.FRONTEND_TAG }}|g" k8s/frontend-deployment.yaml
+
+            kubectl apply -f k8s/backend-deployment.yaml
+            kubectl apply -f k8s/frontend-deployment.yaml
+
+            kubectl rollout status deployment/backend-deployment -n production-chat
+            kubectl rollout status deployment/frontend-deployment -n production-chat
