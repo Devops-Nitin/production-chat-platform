@@ -17,7 +17,7 @@ spec:
         - name: dockerhub-secret
       containers:
         - name: frontend
-          image: nsmachine/production:frontend-v13
+          image: nsmachine/production:frontend-0c4ed90
           imagePullPolicy: Always
           ports:
             - containerPort: 80
