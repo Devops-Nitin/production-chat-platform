@@ -1,20 +1,29 @@
-name: ChatSphere AI Production Deploy
+name: ChatSphere AI CI/CD GitOps Pipeline
 
 on:
   push:
     branches:
       - develop
+    paths:
+      - "backend/**"
+      - "frontend/**"
+      - ".github/workflows/deploy-production.yml"
+
+permissions:
+  contents: write
 
 env:
   DOCKER_IMAGE: nsmachine/production
 
 jobs:
-  build-and-deploy:
+  build-push-update-manifests:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Code
+      - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Generate Image Tags
         run: |
@@ -27,38 +36,34 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build Backend Image
+      - name: Build and Push Backend Image
         run: |
           docker build -t $DOCKER_IMAGE:$BACKEND_TAG ./backend
           docker push $DOCKER_IMAGE:$BACKEND_TAG
 
-      - name: Build Frontend Image
+      - name: Build and Push Frontend Image
         run: |
           docker build -t $DOCKER_IMAGE:$FRONTEND_TAG ./frontend
           docker push $DOCKER_IMAGE:$FRONTEND_TAG
 
-      - name: Deploy to Public K3s Server
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          script: |
-            export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
-            cd /opt/chatsphere/production-chat-platform
+      - name: Update Kubernetes Manifests
+        run: |
+          sed -i "s|image: nsmachine/production:backend-.*|image: nsmachine/production:$BACKEND_TAG|g" k8s/backend-deployment.yaml
+          sed -i "s|image: nsmachine/production:backend-v1|image: nsmachine/production:$BACKEND_TAG|g" k8s/backend-deployment.yaml
 
-            git fetch origin
-            git checkout develop
-            git pull origin develop
+          sed -i "s|image: nsmachine/production:frontend-.*|image: nsmachine/production:$FRONTEND_TAG|g" k8s/frontend-deployment.yaml
+          sed -i "s|image: nsmachine/production:frontend-v13|image: nsmachine/production:$FRONTEND_TAG|g" k8s/frontend-deployment.yaml
 
-            sed -i "s|image: nsmachine/production:backend-.*|image: nsmachine/production:${{ env.BACKEND_TAG }}|g" k8s/backend-deployment.yaml
-            sed -i "s|image: nsmachine/production:backend-v1|image: nsmachine/production:${{ env.BACKEND_TAG }}|g" k8s/backend-deployment.yaml
+      - name: Commit Updated Manifests
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
 
-            sed -i "s|image: nsmachine/production:frontend-.*|image: nsmachine/production:${{ env.FRONTEND_TAG }}|g" k8s/frontend-deployment.yaml
-            sed -i "s|image: nsmachine/production:frontend-v13|image: nsmachine/production:${{ env.FRONTEND_TAG }}|g" k8s/frontend-deployment.yaml
+          git add k8s/backend-deployment.yaml k8s/frontend-deployment.yaml
 
-            kubectl apply -f k8s/backend-deployment.yaml
-            kubectl apply -f k8s/frontend-deployment.yaml
-
-            kubectl rollout status deployment/backend-deployment -n production-chat
-            kubectl rollout status deployment/frontend-deployment -n production-chat
+          if git diff --cached --quiet; then
+            echo "No manifest changes to commit"
+          else
+            git commit -m "chore: update image tags for ArgoCD deployment"
+            git push origin develop
+          fi
