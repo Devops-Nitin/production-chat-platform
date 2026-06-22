@@ -5,23 +5,42 @@ metadata:
   name: chatsphere-ai-ingress
   namespace: production-chat
   annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-http01
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
     nginx.ingress.kubernetes.io/proxy-body-size: "50m"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "3600"
 
 spec:
   ingressClassName: nginx
 
-  defaultBackend:
-    service:
-      name: frontend-service
-      port:
-        number: 80
+  tls:
+    - hosts:
+        - 49.249.22.163.sslip.io
+      secretName: chatsphere-ai-tls
 
   rules:
-    - host: chatsphereai.com
+    - host: 49.249.22.163.sslip.io
       http:
         paths:
+          - path: /socket.io
+            pathType: Prefix
+            backend:
+              service:
+                name: backend-service
+                port:
+                  number: 5000
+
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: backend-service
+                port:
+                  number: 5000
+
           - path: /
             pathType: Prefix
             backend:

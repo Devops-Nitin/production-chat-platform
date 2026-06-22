@@ -1,0 +1,60 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: chatsphere-alert-rules
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: chatsphere.rules
+      rules:
+        - alert: ChatSphereBackendDown
+          expr: kube_deployment_status_replicas_available{namespace="production-chat", deployment="backend-deployment"} < 1
+          for: 1m
+          labels:
+            severity: critical
+            app: chatsphere
+          annotations:
+            summary: "ChatSphere backend is down"
+            description: "No backend pod is available in production-chat namespace."
+
+        - alert: ChatSphereFrontendDown
+          expr: kube_deployment_status_replicas_available{namespace="production-chat", deployment="frontend-deployment"} < 1
+          for: 1m
+          labels:
+            severity: critical
+            app: chatsphere
+          annotations:
+            summary: "ChatSphere frontend is down"
+            description: "No frontend pod is available in production-chat namespace."
+
+        - alert: ChatSphereMongoDown
+          expr: kube_deployment_status_replicas_available{namespace="production-chat", deployment="mongo-deployment"} < 1
+          for: 1m
+          labels:
+            severity: critical
+            app: chatsphere
+          annotations:
+            summary: "ChatSphere MongoDB is down"
+            description: "MongoDB deployment has no available pod."
+
+        - alert: ChatSphereRedisDown
+          expr: kube_deployment_status_replicas_available{namespace="production-chat", deployment="redis-deployment"} < 1
+          for: 1m
+          labels:
+            severity: critical
+            app: chatsphere
+          annotations:
+            summary: "ChatSphere Redis is down"
+            description: "Redis deployment has no available pod."
+
+        - alert: ChatSpherePodRestarting
+          expr: increase(kube_pod_container_status_restarts_total{namespace="production-chat"}[5m]) > 2
+          for: 1m
+          labels:
+            severity: warning
+            app: chatsphere
+          annotations:
+            summary: "ChatSphere pod restarting frequently"
+            description: "A pod in production-chat restarted more than 2 times in 5 minutes."
