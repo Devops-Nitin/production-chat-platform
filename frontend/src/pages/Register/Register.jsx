@@ -51,7 +51,7 @@ function Register() {
         <div className="auth-brand">
           <div className="auth-logo">CS</div>
           <h1>Create Account</h1>
-          <p>Join ChatSphere AI and start secure real-time conversations.</p>
+          <p>Join ChatSphere AI v1.1 Gitops Demo and start secure real-time conversations.</p>
         </div>
 
         {error && <div className="auth-error">{error}</div>}
