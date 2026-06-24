@@ -17,7 +17,7 @@ spec:
         - name: dockerhub-secret
       containers:
         - name: backend
-          image: nsmachine/production:backend-a0d8ce1
+          image: nsmachine/production:backend-c8b5ab8
           imagePullPolicy: Always
           ports:
             - containerPort: 5000
