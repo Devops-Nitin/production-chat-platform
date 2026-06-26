@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+
+metadata:
+  name: backend-configmap
+  namespace: {{ .Values.namespace }}
+
+data:
+  PORT: {{ .Values.config.port | quote }}
+  NODE_ENV: {{ .Values.config.nodeEnv | quote }}
+  JWT_EXPIRES_IN: {{ .Values.config.jwtExpiresIn | quote }}
+  CLIENT_URL: {{ .Values.config.clientUrl | quote }}
+  REDIS_URL: {{ .Values.config.redisUrl | quote }}
