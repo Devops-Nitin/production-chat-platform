@@ -5,7 +5,7 @@ frontend:
   replicas: 2
   image:
     repository: nsmachine/production
-    tag: frontend-0c4ed90
+    tag: frontend-cb9b0c3
     pullPolicy: IfNotPresent
   service:
     name: frontend-service
@@ -19,7 +19,7 @@ backend:
   replicas: 1
   image:
     repository: nsmachine/production
-    tag: backend-0c4ed90
+    tag: backend-cb9b0c3
     pullPolicy: IfNotPresent
   service:
     name: backend-service
