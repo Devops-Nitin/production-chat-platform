@@ -7,6 +7,7 @@ on:
     paths:
       - "backend/**"
       - "frontend/**"
+      - "helm/chatsphere-ai/**"
       - ".github/workflows/deploy-production.yml"
 
 permissions:
@@ -16,7 +17,7 @@ env:
   DOCKER_IMAGE: nsmachine/production
 
 jobs:
-  build-push-update-manifests:
+  build-push-update-helm-values:
     runs-on: ubuntu-latest
 
     steps:
@@ -46,24 +47,26 @@ jobs:
           docker build -t $DOCKER_IMAGE:$FRONTEND_TAG ./frontend
           docker push $DOCKER_IMAGE:$FRONTEND_TAG
 
-      - name: Update Kubernetes Manifests
+      - name: Update Helm Production Values
         run: |
-          sed -i "s|image: nsmachine/production:backend-.*|image: nsmachine/production:$BACKEND_TAG|g" k8s/backend-deployment.yaml
-          sed -i "s|image: nsmachine/production:backend-v1|image: nsmachine/production:$BACKEND_TAG|g" k8s/backend-deployment.yaml
+          sed -i "/backend:/,/service:/ s|tag: .*|tag: $BACKEND_TAG|g" helm/chatsphere-ai/values-prod.yaml
+          sed -i "/frontend:/,/service:/ s|tag: .*|tag: $FRONTEND_TAG|g" helm/chatsphere-ai/values-prod.yaml
 
-          sed -i "s|image: nsmachine/production:frontend-.*|image: nsmachine/production:$FRONTEND_TAG|g" k8s/frontend-deployment.yaml
-          sed -i "s|image: nsmachine/production:frontend-v13|image: nsmachine/production:$FRONTEND_TAG|g" k8s/frontend-deployment.yaml
+      - name: Validate Helm Chart
+        run: |
+          helm lint helm/chatsphere-ai
+          helm template chatsphere-ai helm/chatsphere-ai -f helm/chatsphere-ai/values-prod.yaml > /tmp/chatsphere-rendered.yaml
 
-      - name: Commit Updated Manifests
+      - name: Commit Updated Helm Values
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
 
-          git add k8s/backend-deployment.yaml k8s/frontend-deployment.yaml
+          git add helm/chatsphere-ai/values-prod.yaml
 
           if git diff --cached --quiet; then
-            echo "No manifest changes to commit"
+            echo "No Helm values changes to commit"
           else
-            git commit -m "chore: update image tags for ArgoCD deployment"
+            git commit -m "chore: update Helm image tags for ArgoCD deployment"
             git push origin develop
           fi

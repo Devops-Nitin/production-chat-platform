@@ -1,0 +1,79 @@
+namespace: production-chat
+
+frontend:
+  name: frontend-deployment
+  replicas: 2
+  image:
+    repository: nsmachine/production
+    tag: frontend-0c4ed90
+    pullPolicy: IfNotPresent
+  service:
+    name: frontend-service
+    type: NodePort
+    port: 80
+    targetPort: 80
+    nodePort: 30080
+
+backend:
+  name: backend-deployment
+  replicas: 1
+  image:
+    repository: nsmachine/production
+    tag: backend-0c4ed90
+    pullPolicy: IfNotPresent
+  service:
+    name: backend-service
+    type: ClusterIP
+    port: 5000
+    targetPort: 5000
+
+mongo:
+  name: mongo-deployment
+  image: mongo:7
+  service:
+    name: mongo-service
+    port: 27017
+  pvc:
+    name: mongo-pvc
+    storage: 5Gi
+
+redis:
+  name: redis-deployment
+  image: redis:7-alpine
+  service:
+    name: redis-service
+    port: 6379
+
+ingress:
+  enabled: true
+  name: chatsphere-ai-ingress
+  className: nginx
+  host: 49.249.22.163.sslip.io
+  tls:
+    enabled: true
+    secretName: chatsphere-ai-tls
+
+hpa:
+  backend:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 4
+    cpu: 70
+  frontend:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    cpu: 70
+
+config:
+  port: "5000"
+  nodeEnv: "production"
+  jwtExpiresIn: "7d"
+  clientUrl: "http://frontend-service"
+  redisUrl: "redis://redis-service:6379"
+
+secrets:
+  jwtSecret: "chatapp_super_secret_jwt_key_2026"
+  mongoUri: "mongodb://admin:Admin%40123@mongo-service:27017/chatapp?authSource=admin"
+  mongoUsername: "admin"
+  mongoPassword: "Admin@123"
